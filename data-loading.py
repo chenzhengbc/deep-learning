@@ -15,17 +15,17 @@ def add_counts_by_product_master_id(df):
     return df
 
 
-def group_data(df):
+def group_data_by_counts(df):
     multi_items = df[df['Counts'] > 1]
     single_item = df[df['Counts'] <= 1]
     return (multi_items, single_item)
 
 
 def transform(df, match):
-    df['VMVM-R'] = lev.ratio(df['VMID-1'], df['VMID-2'])
-    df['VMMM-R'] = lev.ratio(df['VMID-1'], df['MMID-2'])
-    df['MMMM-R'] = lev.ratio(df['MMID-1'], df['MMID-2'])
-    df['MMVM-R'] = lev.ratio(df['MMID-1'], df['VMID-2'])
+    df['VM1-VM2-R'] = lev.ratio(df['VMID-1'], df['VMID-2'])
+    df['VM1-MM2-R'] = lev.ratio(df['VMID-1'], df['MMID-2'])
+    df['MM1-MM2-R'] = lev.ratio(df['MMID-1'], df['MMID-2'])
+    df['MM1-VM2-R'] = lev.ratio(df['MMID-1'], df['VMID-2'])
     df['ItemDesc-R'] = lev.ratio(df['ItemDesc-1'], df['ItemDesc-2'])
     df['VendorDesc-R'] = lev.ratio(df['VendorDesc-1'], df['VendorDesc-2'])
     df['ManufacturerDesc-R'] = lev.ratio(df['ManufacturerDesc-1'],
@@ -55,43 +55,45 @@ def ml_raw_columns():
 
 
 def ml_preprocessing_columns():
-    return ['VMVM-R', 'VMMM-R', 'MMMM-R', 'MMVM-R', 'ItemDesc-R', 'VendorDesc-R', 'ManufacturerDesc-R', 'Match']
+    return ['VM1-VM2-R', 'VM1-MM2-R', 'MM1-MM2-R', 'MM1-VM2-R', 'ItemDesc-R', 'VendorDesc-R', 'ManufacturerDesc-R', 'Match']
 
 
 # Perform combination within the data frame
 def generate_pair(df):
     combination = list(itertools.combinations(df.values, 2))
-    entries = [list(itertools.chain(entry[0], entry[1]))
-               for entry in combination]
-    pair_df = pd.DataFrame(
+    return combination
+
+
+def convert_pair_to_df(combination):
+    entries = [list(itertools.chain(item_pair[0], item_pair[1]))
+               for item_pair in combination]
+    entry_df = pd.DataFrame(
         entries, columns=item_pair_columns(ml_raw_columns()))
-    pair_result = pair_df.apply(transform_match, axis=1)
+    return entry_df
+
+
+def generate_ml_input(entry_df):
+    pair_result = entry_df.apply(transform_match, axis=1)
     return pair_result[ml_preprocessing_columns()]
 
 
 def process_products_with_multi_items(mi):
     grouped = mi.groupby('ProductMasterId')
-    for name, items_in_group in grouped:
+    for product_master_id, items_in_group in grouped:
         # TODO this is for quick unit testing ONLY
-        if (name == 4):
+        if (product_master_id == 4):
             print(
-                "Processing Items from Product Master ID={name}".format(name=name))
+                "Processing Items from Product Master ID={name}".format(name=product_master_id))
             item_list = items_in_group[['ItemKey', 'ItemKey', 'VMID', 'MMID', 'ItemDesc',
                                         'VendorDesc', 'ManufacturerDesc']]
             item_pairs = generate_pair(df=item_list)
-            print(item_pairs)
+            item_df = convert_pair_to_df(item_pairs)
+            input = generate_ml_input(item_df)
+            print(input)
 
 
 # Main
 df = pd.read_csv("items.csv")
 df = add_counts_by_product_master_id(df)
-multi_items_input, single_item_input = group_data(df)
+multi_items_input, single_item_input = group_data_by_counts(df)
 process_products_with_multi_items(multi_items_input)
-
-
-# %% Unit Test
-# df = pd.read_csv("4.csv")
-# input = generate_pair(df)
-# input
-
-# %%
