@@ -3,6 +3,7 @@ import itertools
 
 import Levenshtein as lev
 import pandas as pd
+from pandas.core.frame import DataFrame
 
 
 # Util Functions
@@ -22,16 +23,22 @@ def group_data_by_counts(df):
 
 
 def transform(df, match):
-    df['VM1-VM2-R'] = lev.ratio(df['VMID-1'], df['VMID-2'])
-    df['VM1-MM2-R'] = lev.ratio(df['VMID-1'], df['MMID-2'])
-    df['MM1-MM2-R'] = lev.ratio(df['MMID-1'], df['MMID-2'])
-    df['MM1-VM2-R'] = lev.ratio(df['MMID-1'], df['VMID-2'])
-    df['ItemDesc-R'] = lev.ratio(df['ItemDesc-1'], df['ItemDesc-2'])
-    df['VendorDesc-R'] = lev.ratio(df['VendorDesc-1'], df['VendorDesc-2'])
-    df['ManufacturerDesc-R'] = lev.ratio(df['ManufacturerDesc-1'],
-                                         df['ManufacturerDesc-2'])
+    df['VM1-VM2-R'] = ratio(df['VMID-1'], df['VMID-2'])
+    df['VM1-MM2-R'] = ratio(df['VMID-1'], df['MMID-2'])
+    df['MM1-MM2-R'] = ratio(df['MMID-1'], df['MMID-2'])
+    df['MM1-VM2-R'] = ratio(df['MMID-1'], df['VMID-2'])
+    df['ItemDesc-R'] = ratio(df['ItemDesc-1'], df['ItemDesc-2'])
+    df['VendorDesc-R'] = ratio(df['VendorDesc-1'], df['VendorDesc-2'])
+    df['ManufacturerDesc-R'] = ratio(df['ManufacturerDesc-1'],
+                                     df['ManufacturerDesc-2'])
     df['Match'] = match
     return df
+
+
+def ratio(string1, string2):
+    string1 = '' if string1 is None else str(string1)
+    string2 = '' if string2 is None else str(string2)
+    return lev.ratio(string1, string2)
 
 
 def transform_match(df):
@@ -51,7 +58,7 @@ def item_pair_columns(columns):
 
 def ml_raw_columns():
     # ['ItemKey', 'SourceId', 'ItemSetId',	'ItemId', 'VMID', 'MMID', 'ItemDesc',	'VendorDesc', 'ManufacturerDesc']
-    return ['ItemIndex', 'ItemKey', 'VMID', 'MMID', 'ItemDesc', 'VendorDesc', 'ManufacturerDesc']
+    return ['ItemKey', 'VMID', 'MMID', 'ItemDesc', 'VendorDesc', 'ManufacturerDesc']
 
 
 def ml_preprocessing_columns():
@@ -79,21 +86,21 @@ def generate_ml_input(entry_df):
 
 def process_products_with_multi_items(mi):
     grouped = mi.groupby('ProductMasterId')
+    multi_item_input = DataFrame(columns=ml_preprocessing_columns())
     for product_master_id, items_in_group in grouped:
         # TODO this is for quick unit testing ONLY
-        if (product_master_id == 4):
-            print(
-                "Processing Items from Product Master ID={name}".format(name=product_master_id))
-            item_list = items_in_group[['ItemKey', 'ItemKey', 'VMID', 'MMID', 'ItemDesc',
-                                        'VendorDesc', 'ManufacturerDesc']]
-            item_pairs = generate_pair(df=item_list)
-            item_df = convert_pair_to_df(item_pairs)
-            input = generate_ml_input(item_df)
-            print(input)
+        print(
+            "Processing Items from Product Master ID={name}".format(name=product_master_id))
+        item_list = items_in_group[ml_raw_columns()]
+        item_pairs = generate_pair(df=item_list)
+        item_df = convert_pair_to_df(item_pairs)
+        input = generate_ml_input(item_df)
+        multi_item_input = multi_item_input.append(input)
+    multi_item_input.to_csv("multi_item_input.csv", index=False)
 
 
 # Main
-df = pd.read_csv("items.csv")
+df = pd.read_csv("items_1000.csv")
 df = add_counts_by_product_master_id(df)
 multi_items_input, single_item_input = group_data_by_counts(df)
 process_products_with_multi_items(multi_items_input)
