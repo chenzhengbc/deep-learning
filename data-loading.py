@@ -1,5 +1,6 @@
 # %%
 import itertools
+import time
 
 import Levenshtein as lev
 import pandas as pd
@@ -85,22 +86,33 @@ def generate_ml_input(entry_df):
 
 
 def process_products_with_multi_items(mi):
+    method_start = time.perf_counter()
     grouped = mi.groupby('ProductMasterId')
     multi_item_input = DataFrame(columns=ml_preprocessing_columns())
+    processed_product_count = 0
     for product_master_id, items_in_group in grouped:
+        processed_product_count = processed_product_count + 1
         # TODO this is for quick unit testing ONLY
-        print(
-            "Processing Items from Product Master ID={name}".format(name=product_master_id))
+        # print(
+        #     "Processing Items from Product Master ID={name}".format(name=product_master_id))
         item_list = items_in_group[ml_raw_columns()]
         item_pairs = generate_pair(df=item_list)
         item_df = convert_pair_to_df(item_pairs)
         input = generate_ml_input(item_df)
         multi_item_input = multi_item_input.append(input)
+        if (processed_product_count % 1000 == 0):
+            method_end = time.perf_counter()
+            print(
+                f"process_products_with_multi_items elaped {method_end - method_start:0.4f} seconds")
+
+    method_end = time.perf_counter()
+    print(
+        f"process_products_with_multi_items took {method_end - method_start:0.4f} seconds")
     multi_item_input.to_csv("multi_item_input.csv", index=False)
 
 
 # Main
-df = pd.read_csv("items_1000.csv")
+df = pd.read_csv("items_all.csv")
 df = add_counts_by_product_master_id(df)
 multi_items_input, single_item_input = group_data_by_counts(df)
 process_products_with_multi_items(multi_items_input)
